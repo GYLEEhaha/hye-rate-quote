@@ -1,0 +1,18 @@
+# Source Excel (commercial rates; keep local only — publish parsed JSON)
+data/rates.xlsx
+
+# Python
+scripts/__pycache__/
+**/__pycache__/
+*.py[cod]
+.Python
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Local tunnel / temp
+.tmp/
