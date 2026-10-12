@@ -10,10 +10,10 @@
 GitHub Pages（`*.github.io`）在大陆常不稳定。请用下面的 **CDN XHTML 入口**（返回 `application/xhtml+xml`，可正常打开；页面会再加载运价 HTML/JS/JSON）：
 
 - **推荐（国内镜像，钉死当前提交）**：  
-  https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@38f3b462b3a5a880a40c3d07959bf03782673574/index.xhtml
+  https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@417bc239ed391be32b1a36c1d90fa80920660111/index.xhtml
 - **备用**：  
-  https://cdn.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@38f3b462b3a5a880a40c3d07959bf03782673574/index.xhtml  
-  https://testingcf.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@38f3b462b3a5a880a40c3d07959bf03782673574/index.xhtml  
+  https://cdn.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@417bc239ed391be32b1a36c1d90fa80920660111/index.xhtml  
+  https://testingcf.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@417bc239ed391be32b1a36c1d90fa80920660111/index.xhtml  
   https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@main/index.xhtml
 
 不要直接打开 CDN 上的 `index.html`（会被当成纯文本下载/显示）。  
