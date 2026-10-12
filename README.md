@@ -7,15 +7,16 @@
 
 ## 国内访问（免翻墙优先）
 
-GitHub Pages（`*.github.io`）在大陆常不稳定。可优先试：
+GitHub Pages（`*.github.io`）在大陆常不稳定。推荐用 CDN 的 **XHTML 入口**（`application/xhtml+xml`，可渲染；内部再加载 HTML 应用）：
 
-1. **jsDelivr 中国镜像（资源）**：JS/CSS/JSON 可用  
-   `https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@main/`  
-   注意：jsDelivr 对 **HTML 强制 `text/plain`**，不能直接当网站入口。
-2. **XHTML 入口（若 CDN 返回可渲染类型）**：  
-   `https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@main/index.xhtml`  
-   （推送后稍等缓存；若仍是纯文本则不可用。）
-3. 原 Pages：`https://gyleehaha.github.io/hye-rate-quote/`（需可访问 GitHub 时）
+- **主用（jsDelivr 国内镜像）**：  
+  https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@main/index.xhtml
+- **备用**：  
+  https://cdn.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@main/index.xhtml  
+  https://testingcf.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@main/index.xhtml
+
+说明：直接打开 `index.html` 在 jsDelivr 上会变成纯文本（安全策略），不要用那个链接。  
+原 Pages：https://gyleehaha.github.io/hye-rate-quote/（需可访问 GitHub 时）
 
 登录账号由管理员告知（共用账号 `AQGJ`）。
 

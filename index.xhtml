@@ -4,147 +4,56 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <base href="https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@032698fc12b4d724d9044300f502f9ad41831dc1/" />
   <title>AQ国际 · 内部运价查询</title>
-  <link rel="stylesheet" href="static/style.css" />
+  <style type="text/css"><![CDATA[
+    html, body { margin: 0; padding: 0; height: 100%; background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; }
+    #boot { padding: 2rem; text-align: center; }
+    iframe { border: 0; width: 100%; height: 100%; display: none; }
+    iframe.ready { display: block; }
+    .err { color: #fca5a5; white-space: pre-wrap; }
+  ]]></style>
+  <script type="text/javascript"><![CDATA[
+(async function () {
+  var cdns = [
+    "https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@main/",
+    "https://cdn.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@main/",
+    "https://testingcf.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@main/"
+  ];
+  var boot = document.getElementById("boot");
+  var frame = document.getElementById("app");
+  var lastErr = null;
+  for (var i = 0; i < cdns.length; i++) {
+    var base = cdns[i];
+    try {
+      var res = await fetch(base + "index.html", { cache: "no-cache" });
+      if (!res.ok) throw new Error("HTTP " + res.status + " for " + base);
+      var html = await res.text();
+      if (html.indexOf("<html") === -1 && html.indexOf("<HTML") === -1) {
+        throw new Error("Not HTML from " + base);
+      }
+      // Force asset base to the working CDN prefix
+      if (/<base\s/i.test(html)) {
+        html = html.replace(/<base\s[^>]*>/i, '<base href="' + base + '" />');
+      } else {
+        html = html.replace(/<head([^>]*)>/i, '<head$1><base href="' + base + '" />');
+      }
+      frame.srcdoc = html;
+      frame.className = "ready";
+      if (boot) boot.style.display = "none";
+      return;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  if (boot) {
+    boot.innerHTML = '<p class="err">加载失败：' + String(lastErr && lastErr.message || lastErr) +
+      '\n\n可改用 GitHub Pages（需可访问 GitHub）：\nhttps://gyleehaha.github.io/hye-rate-quote/</p>';
+  }
+})();
+  ]]></script>
 </head>
 <body>
-  <div id="loginGate" class="login-gate" aria-live="polite">
-    <div class="login-card card">
-      <div class="login-brand">
-        <div class="logo">AQ</div>
-        <div>
-          <h1>AQ国际 · 内部运价查询</h1>
-          <p class="sub">内部员工登录后使用 · 非最终结算价</p>
-        </div>
-      </div>
-      <form id="loginForm" autocomplete="off">
-        <label>
-          <span>账号 <em>*</em></span>
-          <input id="loginUser" type="text" required placeholder="请输入账号" autocomplete="username" />
-        </label>
-        <label>
-          <span>密码 <em>*</em></span>
-          <input id="loginPass" type="password" required placeholder="请输入密码" autocomplete="current-password" />
-        </label>
-        <p class="login-error hidden" id="loginError">账号或密码不正确</p>
-        <button type="submit" class="btn primary login-btn">登录</button>
-      </form>
-      <p class="login-hint">仅供内部同事使用，请勿外传链接与账号。</p>
-    </div>
-  </div>
-
-  <div id="appShell" class="hidden">
-  <header class="top">
-    <div class="brand">
-      <div class="logo">AQ</div>
-      <div>
-        <h1>AQ国际 · 内部运价查询</h1>
-        <p class="sub">仅供内部员工参考 · 非最终结算价</p>
-      </div>
-    </div>
-    <div class="header-right">
-      <div class="meta-line" id="metaLine">加载中…</div>
-      <button type="button" class="btn ghost sm" id="btnLogout">退出登录</button>
-    </div>
-  </header>
-
-  <main>
-    <section class="card form-card">
-      <h2>查询条件</h2>
-      <form id="queryForm" autocomplete="off">
-        <div class="grid">
-          <label>
-            <span>渠道大类 <em>*</em></span>
-            <select id="category" required></select>
-          </label>
-          <label>
-            <span>产品 / 渠道</span>
-            <select id="product">
-              <option value="">全部</option>
-            </select>
-          </label>
-          <label>
-            <span>交货仓</span>
-            <select id="warehouse">
-              <option value="">全部</option>
-              <option>上海仓</option>
-              <option>义乌仓</option>
-              <option>坂田仓</option>
-            </select>
-          </label>
-          <label>
-            <span>包税 / 自税</span>
-            <select id="taxMode">
-              <option value="">全部</option>
-              <option>包税</option>
-              <option>自税</option>
-            </select>
-          </label>
-          <label>
-            <span>美国邮编 ZIP</span>
-            <input id="zip" type="text" inputmode="numeric" maxlength="5" placeholder="如 90210 → 自动分区" />
-          </label>
-          <label>
-            <span>分区（可手动）</span>
-            <select id="zone">
-              <option value="">全部 / 自动</option>
-              <option value="美西">美西 (80000-99999)</option>
-              <option value="美中">美中 (40000-79999)</option>
-              <option value="美东">美东 (00000-39999)</option>
-              <option value="头程">头程</option>
-              <option value="岛屿">岛屿</option>
-            </select>
-          </label>
-          <label>
-            <span>FBA / 仓库代码</span>
-            <input id="fba" type="text" placeholder="如 SCK4、ONT8（海卡）" list="fbaList" />
-            <datalist id="fbaList"></datalist>
-          </label>
-          <label>
-            <span>重量 KG</span>
-            <input id="weight" type="number" min="0" step="0.1" placeholder="选填，用于估算总价" />
-          </label>
-          <label>
-            <span>体积 CBM</span>
-            <input id="cbm" type="number" min="0" step="0.01" placeholder="选填，按方计费时用" />
-          </label>
-        </div>
-        <div class="actions">
-          <button type="submit" class="btn primary">查询运价</button>
-          <button type="button" class="btn ghost" id="btnReset">清空</button>
-          <button type="button" class="btn ghost" id="btnSchedule">船期表</button>
-          <button type="button" class="btn ghost" id="btnSurcharge">品名附加费</button>
-        </div>
-      </form>
-      <p class="hint" id="zoneHint"></p>
-    </section>
-
-    <section class="card" id="resultCard">
-      <div class="result-head">
-        <h2>查询结果</h2>
-        <span id="resultCount" class="badge">尚未查询</span>
-      </div>
-      <div id="resultArea" class="empty">
-        请选择渠道大类并点击「查询运价」。价格仅供参考。
-      </div>
-    </section>
-
-    <section class="card hidden" id="extraCard">
-      <div class="result-head">
-        <h2 id="extraTitle">附加信息</h2>
-        <button type="button" class="btn ghost sm" id="btnCloseExtra">关闭</button>
-      </div>
-      <div id="extraArea"></div>
-    </section>
-  </main>
-
-  <footer>
-    <p>AQ国际 · 内部工具 v1 · 数据来自 Excel 报价表解析</p>
-    <p class="disclaimer" id="disclaimer"></p>
-  </footer>
-  </div>
-
-  <script type="text/javascript" src="static/app.js"></script>
+  <div id="boot"><p>AQ国际 运价查询加载中…</p></div>
+  <iframe id="app" title="AQ国际运价查询"></iframe>
 </body>
 </html>
