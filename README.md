@@ -7,17 +7,19 @@
 
 ## 国内访问（免翻墙优先）
 
-GitHub Pages（`*.github.io`）在大陆常不稳定。请用下面的 **CDN XHTML 入口**（返回 `application/xhtml+xml`，可正常打开；页面会再加载运价 HTML/JS/JSON）：
+GitHub Pages（`*.github.io`）在大陆常不稳定。CDN 上的 `index.html` 会被当成纯文本，因此请打开 **`index.xhtml` 入口**（`application/xhtml+xml`）。入口页在 DOM 就绪后拉取同目录 `index.html`，注入 `<base>` 后用 iframe 打开完整查价页；失败会显示明确错误，不再无限「加载中」。
 
-- **推荐（国内镜像，钉死当前提交）**：  
-  https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@f844f1803a2430f45d686d6de9bc2b3bb812fecf/index.xhtml
-- **备用**：  
-  https://cdn.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@f844f1803a2430f45d686d6de9bc2b3bb812fecf/index.xhtml  
-  https://testingcf.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@f844f1803a2430f45d686d6de9bc2b3bb812fecf/index.xhtml  
+发布新提交后，把下面链接里的提交号换成最新 SHA（或先用 `@main`，镜像缓存偶发延迟）：
+
+- **推荐（国内镜像 + 提交钉死）**：推送后见最新 commit 的 README 或用  
+  `https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@<COMMIT>/index.xhtml`
+- **相对固定（跟着 main）**：  
   https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@main/index.xhtml
+- **备用镜像**：  
+  https://cdn.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@main/index.xhtml  
+  https://testingcf.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@main/index.xhtml
 
-不要直接打开 CDN 上的 `index.html`（会被当成纯文本下载/显示）。  
-原 Pages：https://gyleehaha.github.io/hye-rate-quote/
+GitHub Pages（国外/可访问 GitHub 时）：https://gyleehaha.github.io/hye-rate-quote/
 
 登录账号由管理员告知（共用账号 `AQGJ`）。
 

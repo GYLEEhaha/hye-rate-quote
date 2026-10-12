@@ -6,60 +6,126 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AQ国际 · 内部运价查询</title>
   <style type="text/css"><![CDATA[
-    html, body { margin: 0; padding: 0; height: 100%; background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; }
-    #boot { padding: 2rem; text-align: center; }
-    iframe { border: 0; width: 100%; height: 100%; display: none; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #0f172a; color: #e2e8f0; font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    #boot { padding: 2.5rem 1.25rem; text-align: center; max-width: 36rem; margin: 0 auto; }
+    #boot .brand { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; }
+    #boot .spin { display: inline-block; width: 1.1rem; height: 1.1rem; border: 2px solid #64748b; border-top-color: #e2e8f0; border-radius: 50%; animation: sp 0.8s linear infinite; vertical-align: -0.15rem; margin-right: 0.4rem; }
+    @keyframes sp { to { transform: rotate(360deg); } }
+    iframe { border: 0; width: 100%; height: 100%; display: none; background: #f4f6f9; }
     iframe.ready { display: block; }
-    .err { color: #fca5a5; white-space: pre-wrap; }
+    .err { color: #fca5a5; white-space: pre-wrap; text-align: left; background: #1e293b; padding: 1rem; border-radius: 0.75rem; font-size: 0.9rem; line-height: 1.5; }
+    .err a { color: #93c5fd; }
   ]]></style>
-  <script type="text/javascript"><![CDATA[
-(async function () {
-  var refs = ["38f3b462b3a5a880a40c3d07959bf03782673574", "main"];
-  var hosts = [
-    "https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@",
-    "https://cdn.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@",
-    "https://testingcf.jsdelivr.net/gh/GYLEEhaha/hye-rate-quote@"
-  ];
-  var cdns = [];
-  for (var r = 0; r < refs.length; r++) {
-    for (var h = 0; h < hosts.length; h++) {
-      cdns.push(hosts[h] + refs[r] + "/");
-    }
-  }
-  var boot = document.getElementById("boot");
-  var frame = document.getElementById("app");
-  var lastErr = null;
-  for (var i = 0; i < cdns.length; i++) {
-    var base = cdns[i];
-    try {
-      var res = await fetch(base + "index.html", { cache: "no-cache" });
-      if (!res.ok) throw new Error("HTTP " + res.status + " for " + base);
-      var html = await res.text();
-      if (html.indexOf("<html") === -1 && html.indexOf("<HTML") === -1) {
-        throw new Error("Not HTML from " + base);
-      }
-      if (/<base\s/i.test(html)) {
-        html = html.replace(/<base\s[^>]*>/i, '<base href="' + base + '" />');
-      } else {
-        html = html.replace(/<head([^>]*)>/i, function (_m, attrs) { return '<head' + attrs + '><base href="' + base + '" />'; });
-      }
-      frame.srcdoc = html;
-      frame.className = "ready";
-      if (boot) boot.style.display = "none";
-      return;
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  if (boot) {
-    boot.innerHTML = '<p class="err">加载失败：' + String(lastErr && lastErr.message || lastErr) +
-      '\n\n可改用 GitHub Pages（需可访问 GitHub）：\nhttps://gyleehaha.github.io/hye-rate-quote/</p>';
-  }
-})();
-  ]]></script>
 </head>
 <body>
-  <div id="boot"><p>AQ国际 运价查询加载中…</p></div>
+  <div id="boot">
+    <div class="brand">AQ国际</div>
+    <p><span class="spin"></span>运价查询加载中…</p>
+  </div>
   <iframe id="app" title="AQ国际运价查询"></iframe>
+  <script type="text/javascript"><![CDATA[
+(function () {
+  function $(id) { return document.getElementById(id); }
+
+  function withTimeout(ms) {
+    if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) {
+      return AbortSignal.timeout(ms);
+    }
+    var c = new AbortController();
+    setTimeout(function () { try { c.abort(); } catch (e) {} }, ms);
+    return c.signal;
+  }
+
+  function rewriteHost(url, hostBase) {
+    // url like https://cdn.jsdmirror.com/gh/USER/REPO@REF/path
+    var m = String(url).match(/^(https?:\/\/[^/]+)(\/gh\/[^/]+\/[^/@]+@[^/]+\/.*)$/);
+    if (!m) return null;
+    return hostBase.replace(/\/$/, "") + m[2];
+  }
+
+  function collectBases() {
+    var here = new URL("./", window.location.href).href;
+    var bases = [here];
+    var hosts = [
+      "https://cdn.jsdmirror.com",
+      "https://cdn.jsdelivr.net",
+      "https://testingcf.jsdelivr.net",
+      "https://fastly.jsdelivr.net"
+    ];
+    for (var i = 0; i < hosts.length; i++) {
+      var alt = rewriteHost(here, hosts[i]);
+      if (alt && bases.indexOf(alt) === -1) bases.push(alt);
+    }
+    // Last-resort: main branch on China mirror (if opened via stale pin)
+    var mainMirror = "https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@main/";
+    if (bases.indexOf(mainMirror) === -1) bases.push(mainMirror);
+    return bases;
+  }
+
+  function showError(msg) {
+    var boot = $("boot");
+    if (!boot) return;
+    boot.innerHTML =
+      '<div class="brand">AQ国际</div>' +
+      '<p class="err">加载失败：' + msg +
+      '\n\n可改用 GitHub Pages（需可访问 GitHub）：\n' +
+      '<a href="https://gyleehaha.github.io/hye-rate-quote/">https://gyleehaha.github.io/hye-rate-quote/</a></p>';
+  }
+
+  async function loadIntoFrame(base) {
+    var res = await fetch(base + "index.html", {
+      cache: "no-cache",
+      signal: withTimeout(12000)
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status + " @ " + base);
+    var html = await res.text();
+    if (html.indexOf("<html") === -1 && html.indexOf("<HTML") === -1) {
+      throw new Error("Not HTML @ " + base);
+    }
+    if (/<base\s/i.test(html)) {
+      html = html.replace(/<base\s[^>]*>/i, '<base href="' + base + '" />');
+    } else {
+      html = html.replace(/<head([^>]*)>/i, function (_m, attrs) {
+        return "<head" + attrs + '><base href="' + base + '" />';
+      });
+    }
+    var frame = $("app");
+    var boot = $("boot");
+    if (!frame) throw new Error("iframe missing");
+    frame.srcdoc = html;
+    frame.className = "ready";
+    if (boot) boot.style.display = "none";
+  }
+
+  async function start() {
+    var bases = collectBases();
+    var lastErr = null;
+    for (var i = 0; i < bases.length; i++) {
+      try {
+        await loadIntoFrame(bases[i]);
+        return;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    showError(String(lastErr && lastErr.message || lastErr || "unknown"));
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
+  }
+
+  // Hard safety: if still loading after 45s, surface an error
+  setTimeout(function () {
+    var boot = $("boot");
+    var frame = $("app");
+    if (boot && boot.style.display !== "none" && frame && frame.className.indexOf("ready") === -1) {
+      showError("超时。请检查网络后刷新，或使用 GitHub Pages 链接。");
+    }
+  }, 45000);
+})();
+  ]]></script>
 </body>
 </html>
