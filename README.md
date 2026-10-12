@@ -1,8 +1,23 @@
-# 环洋国际速递（HYE）内部运价查询
+# AQ国际 内部运价查询
 
 面向货代内部员工的运价参考查询工具（v1）。**打开页面需先登录**（共用账号，由管理员私下告知）。请勿在公开场合传播链接与账号。
 
 > 说明：登录校验在浏览器端完成（哈希比对），可防随手翻源码看到明文密码，但不是服务端鉴权；正式对外请改用服务端登录。
+
+
+## 国内访问（免翻墙优先）
+
+GitHub Pages（`*.github.io`）在大陆常不稳定。可优先试：
+
+1. **jsDelivr 中国镜像（资源）**：JS/CSS/JSON 可用  
+   `https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@main/`  
+   注意：jsDelivr 对 **HTML 强制 `text/plain`**，不能直接当网站入口。
+2. **XHTML 入口（若 CDN 返回可渲染类型）**：  
+   `https://cdn.jsdmirror.com/gh/GYLEEhaha/hye-rate-quote@main/index.xhtml`  
+   （推送后稍等缓存；若仍是纯文本则不可用。）
+3. 原 Pages：`https://gyleehaha.github.io/hye-rate-quote/`（需可访问 GitHub 时）
+
+登录账号由管理员告知（共用账号 `AQGJ`）。
 
 ## 如何打开（本机）
 

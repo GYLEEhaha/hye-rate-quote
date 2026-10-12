@@ -1,4 +1,4 @@
-/* 环洋 HYE 内部运价查询 */
+/* AQ国际 内部运价查询 */
 (function () {
   // Expected SHA-256 hex of "username:password" (built offline; no plaintext secret here)
   const AUTH_HASH =

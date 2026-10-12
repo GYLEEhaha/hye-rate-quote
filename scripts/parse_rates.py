@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-环洋国际速递 (HYE) 运价 Excel 解析脚本
+AQ国际 运价 Excel 解析脚本
 用法: python3 scripts/parse_rates.py
 读取 data/rates.xlsx，输出 data/parsed/*.json
 """
@@ -223,7 +223,7 @@ def parse_catalog(wb) -> dict:
     ws = wb["目录"]
     channels = []
     warehouses = []
-    company = s(cell(ws, 1, 3)) or "环洋国际速递"
+    company = s(cell(ws, 1, 3)) or "AQ国际"
     for r in range(3, 40):
         name = s(cell(ws, r, 4)) or s(cell(ws, r, 3))
         updated = s(cell(ws, r, 7))
@@ -240,7 +240,7 @@ def parse_catalog(wb) -> dict:
             wh_details.append(t)
     return {
         "company": company,
-        "brand": "HYE",
+        "brand": "AQ",
         "channels_index": channels,
         "warehouse_addresses": wh_details,
         "parsed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
