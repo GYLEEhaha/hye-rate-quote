@@ -73,6 +73,7 @@ def looks_like_section_title(text: Optional[str]) -> bool:
         return False
     keys = (
         "海派", "海卡", "商私卡", "超大件", "小包", "岛屿", "集运",
+        "空派", "空卡", "头程",
         "极速达", "限时达", "准时达", "快提", "定提", "普船", "特惠",
         "美东", "美西", "美中", "HYE",
     )
@@ -223,18 +224,26 @@ def parse_catalog(wb) -> dict:
     ws = wb["目录"]
     channels = []
     warehouses = []
-    company = s(cell(ws, 1, 3)) or "AQ国际"
+    # Branding for this site is always AQ国际 (Excel may still say 环洋)
+    company = "AQ国际"
     for r in range(3, 40):
-        name = s(cell(ws, r, 4)) or s(cell(ws, r, 3))
-        updated = s(cell(ws, r, 7))
-        if name and "进入" not in name and name not in ("美国海运", "仓   库   地   址", "离境口岸代码", "附    录"):
-            if "仓：" in name or "仓:" in name:
-                warehouses.append(name)
-            elif updated or "HYE" in name or "海" in name or "集运" in name or "系统" in name:
-                channels.append({"name": name, "updated": updated})
-    # warehouse addresses from rows 20-31
+        # Sea books put channel in D; air books put product in E
+        name = s(cell(ws, r, 5)) or s(cell(ws, r, 4)) or s(cell(ws, r, 3))
+        updated = s(cell(ws, r, 8)) or s(cell(ws, r, 7))
+        if not name:
+            continue
+        if "进入" in name or name in ("美国海运", "美国空运", "仓   库   地   址", "离境口岸代码", "附    录"):
+            continue
+        if name in ("大包渠道", "小包渠道", "大件渠道", "空卡渠道", "空派自税渠道", "服务渠道"):
+            continue
+        if "仓：" in name or "仓:" in name:
+            warehouses.append(name)
+        elif "联系" in name or "电话" in name:
+            continue
+        elif updated or "HYE" in name or "海" in name or "空" in name or "集运" in name or "系统" in name:
+            channels.append({"name": name, "updated": updated})
     wh_details = []
-    for r in range(19, 32):
+    for r in range(14, 32):
         t = s(cell(ws, r, 3))
         if t and ("仓" in t or "联系" in t):
             wh_details.append(t)
@@ -245,6 +254,7 @@ def parse_catalog(wb) -> dict:
         "warehouse_addresses": wh_details,
         "parsed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
+
 
 
 def parse_haitou(ws: Worksheet) -> list[dict]:
@@ -956,6 +966,241 @@ def parse_zone_simple(ws: Worksheet, sheet_name: str, category: str) -> list[dic
     return rates
 
 
+
+def _zone_row_ok(zone_raw: Optional[str]) -> bool:
+    if not zone_raw:
+        return False
+    if zone_raw.startswith("比重") or zone_raw.startswith("特别") or "附加" in zone_raw:
+        return False
+    return True
+
+
+def parse_kongpai(ws: Worksheet, sheet_name: str = "HYE空派", category: str = "空派", tax_mode: str = "包税") -> list[dict]:
+    """HYE空派 / similar: product sections with 西/中/东/岛屿 × weight brackets × 上海/坂田."""
+    rates: list[dict] = []
+    product = None
+    transit = notes = order = None
+    # Detect bracket header row dynamically
+    max_r = min(ws.max_row or 80, 120)
+    r = 1
+    while r <= max_r:
+        b = s(cell(ws, r, 2))
+        if b and looks_like_section_title(b):
+            product = b
+            transit = notes = order = None
+            r += 1
+            continue
+        if b and (b.startswith("特别提示") or b.startswith("附加费用")):
+            break
+        # Header row with 区域 / 机场
+        if b in ("区域", "机场") or (b and "区域" in b and s(cell(ws, r, 3)) in ("邮编", None)):
+            # Next row may be weight brackets under warehouse groups
+            # Find warehouse group starts from this header row
+            wh_spans: list[tuple[str, int, int]] = []
+            # Scan header row for warehouse names
+            for c in range(4, 20):
+                lab = s(cell(ws, r, c))
+                if lab and ("仓" in lab or lab in ("上海仓", "坂田仓", "义乌仓", "嘉兴仓")):
+                    wh_spans.append((lab if lab.endswith("仓") else lab, c, c))
+            # Expand spans using next row brackets
+            br_row = r + 1
+            brackets_by_wh: list[tuple[str, int, dict]] = []
+            if wh_spans:
+                # Determine column ranges between warehouse starts
+                starts = [c for _, c, _ in wh_spans] + [20]
+                for i, (wh, start, _) in enumerate(wh_spans):
+                    end = starts[i + 1]
+                    # If next row has weight labels under this span, use them; else single col
+                    found = False
+                    for c in range(start, end):
+                        lab = s(cell(ws, br_row, c))
+                        if lab and ("KG" in lab.upper() or "kg" in lab or "CBM" in lab.upper() or "一口价" in lab):
+                            brackets_by_wh.append((wh, c, parse_weight_bracket(lab)))
+                            found = True
+                    if not found:
+                        # single price column (e.g. 自税 101+KG on header sub-row)
+                        lab = s(cell(ws, br_row, start)) or "标准"
+                        brackets_by_wh.append((wh, start, parse_weight_bracket(lab)))
+            else:
+                # Fallback: D=上海 E=坂田 style
+                for c, wh in ((4, "上海仓"), (5, "坂田仓")):
+                    lab = s(cell(ws, br_row, c)) or s(cell(ws, r, c)) or "标准"
+                    if "KG" in (lab or "").upper() or "kg" in (lab or "") or lab == "标准" or "一口价" in (lab or ""):
+                        brackets_by_wh.append((wh, c, parse_weight_bracket(lab)))
+
+            # Data rows after bracket row
+            rr = br_row + 1
+            while rr <= max_r:
+                zone_raw = s(cell(ws, rr, 2))
+                if zone_raw and looks_like_section_title(zone_raw):
+                    break
+                if zone_raw and (zone_raw.startswith("比重") or zone_raw.startswith("特别") or zone_raw.startswith("附加")):
+                    break
+                if zone_raw and zone_raw in ("区域", "机场"):
+                    break
+                zip_r = s(cell(ws, rr, 3))
+                # airport rows: B=芝加哥, C=60191
+                if zone_raw and _zone_row_ok(zone_raw):
+                    zone = zone_from_zip_range(zip_r if zip_r and "-" in str(zip_r) else None, zone_raw)
+                    if not zone and zip_r and zip_r.isdigit():
+                        zone = "头程"
+                        # keep zip as airport code hint
+                    # pull transit/notes/order from first data row of section if present
+                    # find rightmost note columns
+                    for c in range(20, 3, -1):
+                        v = s(cell(ws, rr, c))
+                        if not v:
+                            continue
+                        # heuristic: long text = transit or notes
+                        if "工作日" in v and not transit:
+                            transit = v
+                        elif ("HYE" in v or "下单" in v) and not order:
+                            order = v
+                        elif len(v) > 8 and not notes:
+                            notes = v
+                    # Better: use known layouts
+                    # 空派: J=transit K=notes L=order  (cols 10,11,12)
+                    t2 = s(cell(ws, rr, 10)) or s(cell(ws, rr, 6)) or s(cell(ws, rr, 12))
+                    n2 = s(cell(ws, rr, 11)) or s(cell(ws, rr, 7)) or s(cell(ws, rr, 13))
+                    o2 = s(cell(ws, rr, 12)) or s(cell(ws, rr, 8)) or s(cell(ws, rr, 14))
+                    if t2 and ("工作日" in t2 or "提取" in t2 or "签收" in t2):
+                        transit = t2
+                    if n2 and "HYE-" not in (n2 or "")[:4]:
+                        notes = n2
+                    if o2 and ("HYE" in o2 or "\\n" in o2):
+                        order = o2
+                    # Also check col 6/7/8 for 自税/超大件 layout
+                    for cand in (s(cell(ws, rr, 6)), s(cell(ws, rr, 7)), s(cell(ws, rr, 8))):
+                        if not cand:
+                            continue
+                        if "工作日" in cand:
+                            transit = cand
+                        elif cand.startswith("HYE") or "HYE-" in cand:
+                            order = cand
+                        elif len(cand) > 10 and "元" not in cand[:3]:
+                            notes = notes or cand
+
+                    for wh, c, br in brackets_by_wh:
+                        price = num(cell(ws, rr, c))
+                        if price is None:
+                            continue
+                        tm = br.get("tax_mode") or tax_mode
+                        rates.append(make_rate(
+                            category=category,
+                            product=product or sheet_name,
+                            channel_name=product or sheet_name,
+                            warehouse=wh,
+                            tax_mode=tm,
+                            zone=zone or zone_raw,
+                            zip_range=zip_r if zip_r and zip_r != "/" else None,
+                            unit=br.get("unit") or "元/KG",
+                            unit_price=price,
+                            weight_bracket=br.get("label"),
+                            weight_min_kg=br.get("weight_min_kg"),
+                            weight_max_kg=br.get("weight_max_kg"),
+                            cbm_min=br.get("cbm_min"),
+                            transit_time=transit,
+                            notes=notes,
+                            order_channels=order,
+                            source_sheet=sheet_name,
+                            flat_rate=br.get("flat_rate", False),
+                        ))
+                rr += 1
+            r = rr
+            continue
+        r += 1
+    return rates
+
+
+def parse_kongpai_xiaobao(ws: Worksheet, sheet_name: str = "HYE空派小包") -> list[dict]:
+    """Flat-rate small parcel by billed weight tiers."""
+    rates: list[dict] = []
+    product = None
+    transit = notes = order = None
+    max_r = min(ws.max_row or 100, 150)
+    r = 1
+    while r <= max_r:
+        b = s(cell(ws, r, 2))
+        if b and looks_like_section_title(b):
+            product = b
+            transit = notes = order = None
+            r += 1
+            continue
+        if b and (b.startswith("特别提示") or b.startswith("附加费用")):
+            break
+        if b == "区域" or (b and "区域" in b):
+            # skip header + 一口价 subheader
+            r += 1
+            if s(cell(ws, r, 4)) == "一口价" or (s(cell(ws, r, 4)) and "一口价" in (s(cell(ws, r, 4)) or "")):
+                r += 1
+            prev_w = 0.0
+            while r <= max_r:
+                zone_raw = s(cell(ws, r, 2))
+                if zone_raw and looks_like_section_title(zone_raw):
+                    break
+                if zone_raw and (zone_raw.startswith("特别") or zone_raw.startswith("附加") or zone_raw.startswith("比重")):
+                    break
+                if zone_raw == "区域":
+                    break
+                w = num(cell(ws, r, 3))
+                sh = num(cell(ws, r, 4))
+                bt = num(cell(ws, r, 5))
+                if zone_raw and ("美国" in zone_raw or zone_raw == "美国"):
+                    t2 = s(cell(ws, r, 6))
+                    n2 = s(cell(ws, r, 7))
+                    o2 = s(cell(ws, r, 9)) or s(cell(ws, r, 8))
+                    if t2:
+                        transit = t2
+                    if n2:
+                        notes = n2
+                    if o2:
+                        order = o2
+                if w is None or (sh is None and bt is None):
+                    r += 1
+                    continue
+                br_label = f"{w:g}kg（一口价）"
+                for wh, price in (("上海仓", sh), ("坂田仓", bt)):
+                    if price is None:
+                        continue
+                    rates.append(make_rate(
+                        category="空派小包",
+                        product=product or sheet_name,
+                        channel_name=product or sheet_name,
+                        warehouse=wh,
+                        tax_mode="包税",
+                        zone="岛屿" if (product and "岛屿" in product) else None,
+                        zip_range=None,
+                        unit="元/票",
+                        unit_price=price,
+                        weight_bracket=br_label,
+                        weight_min_kg=prev_w,
+                        weight_max_kg=w,
+                        transit_time=transit,
+                        notes=notes,
+                        order_channels=order,
+                        source_sheet=sheet_name,
+                        flat_rate=True,
+                    ))
+                prev_w = w
+                r += 1
+            continue
+        r += 1
+    return rates
+
+
+def parse_warehouse_surcharges(ws: Worksheet) -> list[dict]:
+    """美国海外仓快速中转服务 — treat as surcharge list."""
+    items = []
+    for r in range(3, min(ws.max_row or 40, 50) + 1):
+        name = s(cell(ws, r, 1))
+        fee = s(cell(ws, r, 4)) or s(cell(ws, r, 6))
+        note = s(cell(ws, r, 8))
+        if name:
+            items.append({"name": name, "fee": fee, "description": note})
+    return items
+
+
+
 def parse_schedule(ws: Worksheet) -> list[dict]:
     rows = []
     for r in range(5, 21):
@@ -1053,6 +1298,7 @@ def main() -> None:
     catalog = parse_catalog(wb)
     all_rates: list[dict] = []
 
+    # Sea book (legacy) + air book (current). Missing sheets are skipped.
     parsers = [
         ("海派头程报价汇总", lambda: parse_haitou(wb["海派头程报价汇总"])),
         ("集运价格汇总", lambda: parse_jiyun(wb["集运价格汇总"])),
@@ -1067,10 +1313,20 @@ def main() -> None:
         ("HYE超大件", lambda: parse_zone_simple(wb["HYE超大件"], "HYE超大件", "超大件")),
         ("HYE小包裹", lambda: parse_zone_simple(wb["HYE小包裹"], "HYE小包裹", "小包裹")),
         ("HYE岛屿海派", lambda: parse_zone_simple(wb["HYE岛屿海派"], "HYE岛屿海派", "岛屿海派")),
+        # Air book (2026-10)
+        ("HYE空派", lambda: parse_kongpai(wb["HYE空派"], "HYE空派", "空派", "包税")),
+        ("HYE空派自税", lambda: parse_kongpai(wb["HYE空派自税"], "HYE空派自税", "空派自税", "自税")),
+        ("HYE空卡", lambda: parse_kongpai(wb["HYE空卡"], "HYE空卡", "空卡", "包税")),
+        ("HYE空派小包", lambda: parse_kongpai_xiaobao(wb["HYE空派小包"])),
+        ("HYE空派超大件", lambda: parse_kongpai(wb["HYE空派超大件"], "HYE空派超大件", "空派超大件", "包税")),
     ]
 
     sheet_stats = {}
     for name, fn in parsers:
+        if name not in wb.sheetnames:
+            sheet_stats[name] = "SKIP: sheet missing"
+            print(f"  {name}: SKIP (sheet missing)")
+            continue
         try:
             rows = fn()
             sheet_stats[name] = len(rows)
@@ -1080,21 +1336,38 @@ def main() -> None:
             sheet_stats[name] = f"ERROR: {e}"
             print(f"  {name}: ERROR {e}")
 
-    schedule = parse_schedule(wb["船期表"])
-    surcharges = parse_surcharges(wb["海运品名附加费"])
-    print(f"  船期表: {len(schedule)} rows")
-    print(f"  海运品名附加费: {len(surcharges)} items")
+    schedule = []
+    if "船期表" in wb.sheetnames:
+        schedule = parse_schedule(wb["船期表"])
+        print(f"  船期表: {len(schedule)} rows")
+    else:
+        print("  船期表: SKIP (sheet missing)")
+
+    surcharges = []
+    if "海运品名附加费" in wb.sheetnames:
+        surcharges = parse_surcharges(wb["海运品名附加费"])
+        print(f"  海运品名附加费: {len(surcharges)} items")
+    if "美国海外仓快速中转服务" in wb.sheetnames:
+        extra = parse_warehouse_surcharges(wb["美国海外仓快速中转服务"])
+        surcharges.extend(extra)
+        print(f"  美国海外仓快速中转服务: {len(extra)} items")
 
     all_rates = assign_ids(all_rates)
     meta = build_meta(catalog, all_rates, schedule, surcharges)
+    meta["company"] = "AQ国际"
+    meta["brand"] = "AQ"
     meta["sheet_stats"] = sheet_stats
+
+    # Drop stale per-category files from previous books
+    if OUT.exists():
+        for old in OUT.glob("rates_*.json"):
+            old.unlink()
 
     save_json("rates.json", all_rates)
     save_json("meta.json", meta)
-    # compact index for UI bootstrap
     save_json("index.json", {
-        "company": meta["company"],
-        "brand": meta["brand"],
+        "company": "AQ国际",
+        "brand": "AQ",
         "categories": meta["categories"],
         "products_by_category": meta["products_by_category"],
         "warehouses": meta["warehouses"],
@@ -1105,7 +1378,6 @@ def main() -> None:
         "parsed_at": meta["parsed_at"],
         "zip_zones": meta["zip_zones"],
     })
-    # per-category files for faster UI loads
     from collections import defaultdict
     by_cat = defaultdict(list)
     for r in all_rates:
@@ -1120,6 +1392,7 @@ def main() -> None:
     })
     save_json("fba_codes.json", fba_codes)
     print(f"\nDone. Total rates: {len(all_rates)}")
+
 
 
 if __name__ == "__main__":
